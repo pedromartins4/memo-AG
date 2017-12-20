@@ -7,6 +7,7 @@ This repository contains source code to benchmark the performance (speed and mem
 #### What is ZipperAG?
 
 ZipperAG is a  modular, zipper-based, memoized implementation of Attribute Grammars (AG). Implemented in Haskell, can be found in [Hackage](https://hackage.haskell.org/package/ZipperAG).
+
 Reference publications:
 * *"Zipper-Based Attribute Grammars and Their Extensions"*  published [here](https://link.springer.com/chapter/10.1007/978-3-642-40922-6_10).
 * *"Embedding attribute grammars and their extensions using functional zippers"* published [here](https://dl.acm.org/citation.cfm?id=3044220.3064441).
@@ -38,6 +39,6 @@ For memory profiling dependencies have to be installed with `-p`: `cabal install
 
 #### I want to know more.
 
-Let's have a chat then. Send an email to one (or even all) of the authors on the papers above.
+Let's have a chat then. Send an email to one (or even all) of the authors on the papers above. Alternatively add an `Issue` to this repository.
 
 ##### Happy benchmarking!
