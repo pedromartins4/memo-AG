@@ -8,7 +8,6 @@ import Data.Data
 import Shared
 import Original
 import Memo
-import Memo2
 
 testTree2 :: Int -> Int -> Root
 testTree2 r e = Root $ RootTable (rows e r)
