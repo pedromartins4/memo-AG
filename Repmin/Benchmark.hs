@@ -23,12 +23,12 @@ original  = (Original.semantics) (testTree 5)
 memoized  = (Memo.semantics)     (testTree 5)
 memoized2 = (Memo2.semantics)    (testTree 5)
 main :: IO()
--- main = putStrLn . show $ original
-main = putStrLn . show $ memoized
+main = putStrLn . show $ original
+-- main = putStrLn . show $ memoized
 -- main = putStrLn . show $ memoized2
 
 
----- Speeed Benchmark ----
+---- Speed Benchmark ----
 --main :: IO()
 --main = defaultMain [
 --  bgroup "Repmin" [ bench "Original 2" $ nf (sumTree . (Original.semantics)) (testTree 2)
