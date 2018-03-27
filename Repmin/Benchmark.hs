@@ -23,7 +23,7 @@ original  = (Original.semantics) (testTree 5)
 memoized  = (Memo.semantics)     (testTree 5)
 memoized2 = (Memo2.semantics)    (testTree 5)
 main :: IO()
-main = putStrLn . show $ original
+main = putStrLn . show $ (Original.semantics) (Leaf 3)
 -- main = putStrLn . show $ memoized
 -- main = putStrLn . show $ memoized2
 

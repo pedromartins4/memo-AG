@@ -3,7 +3,7 @@ module Main where
 
 import Language.Grammars.ZipperAG
 import Data.Generics.Zipper
-import Criterion.Main
+-- import Criterion.Main
 import Data.Maybe
 import Data.Data
 import Data.Dynamic
@@ -115,11 +115,10 @@ genListAssign n
 
 
 
--- For profiling individual executions
-
+---- Memory Profiling Benchmark ----
 -- LetSem (no memo)
--- main :: IO()
--- main = putStrLn . show . (LetSem.semantics) $ (genLetProg 5)
+main :: IO()
+main = putStrLn . show . (LetSem.semantics) $ (genLetProg 5)
 
 -- LetSem HO Algol68 (no memo)
 -- main :: IO ()
@@ -133,71 +132,73 @@ genListAssign n
 -- main :: IO()
 -- main = putStrLn . show . (LetSem_Memo_Algol68_mBIn_Rec.semantics) $ (genLetProg 30)
 
-main :: IO ()
-main = defaultMain 
-  [ bgroup "Let"
-      [ bench "LetSem (no memo) 6" $ nf ((LetSem.semantics)) (genLetProg 6)
-      , bench "LetSem HO Algol68 (no memo) 6" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 6)
-      , bench "LetSem HO (Algol Memo) 6" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 6)
-      , bench "LetSem HO Full Memo 6" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 6)
-      
-      , bench "LetSem (no memo) 7" $ nf ((LetSem.semantics)) (genLetProg 7)
-      , bench "LetSem HO Algol68 (no memo) 7" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 7)
-      , bench "LetSem HO (Algol Memo) 7" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 7)
-      , bench "LetSem HO Full Memo 7" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 7)
 
-      , bench "LetSem (no memo) 8" $ nf ((LetSem.semantics)) (genLetProg 8)
-      , bench "LetSem HO Algol68 (no memo) 8" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 8)
-      , bench "LetSem HO (Algol Memo) 8" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 8)
-      , bench "LetSem HO Full Memo 8" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 8)
-
-      , bench "LetSem (no memo) 9" $ nf ((LetSem.semantics)) (genLetProg 9)
-      , bench "LetSem HO Algol68 (no memo) 9" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 9)
-      , bench "LetSem HO (Algol Memo) 9" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 9)
-      , bench "LetSem HO Full Memo 9" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 9)
-
-      , bench "LetSem (no memo) 10" $ nf ((LetSem.semantics)) (genLetProg 10)
-      , bench "LetSem HO Algol68 (no memo) 10" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 10)
-      , bench "LetSem HO (Algol Memo) 10" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 10)
-      , bench "LetSem HO Full Memo 10" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 10)
-
-      , bench "LetSem (no memo) 11" $ nf ((LetSem.semantics)) (genLetProg 11)
-      , bench "LetSem HO Algol68 (no memo) 11" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 11)
-      , bench "LetSem HO (Algol Memo) 11" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 11)
-      , bench "LetSem HO Full Memo 11" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 11)
-
-      , bench "LetSem (no memo) 12" $ nf ((LetSem.semantics)) (genLetProg 12)
-      , bench "LetSem HO Algol68 (no memo) 12" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 12)
-      , bench "LetSem HO (Algol Memo) 12" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 12)
-      , bench "LetSem HO Full Memo 12" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 12)
-
-      , bench "LetSem (no memo) 13" $ nf ((LetSem.semantics)) (genLetProg 13)
-      , bench "LetSem HO Algol68 (no memo) 13" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 13)
-      , bench "LetSem HO (Algol Memo) 13" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 13)
-      , bench "LetSem HO Full Memo 13" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 13)
-
-      , bench "LetSem (no memo) 14" $ nf ((LetSem.semantics)) (genLetProg 14)
-      , bench "LetSem HO Algol68 (no memo) 14" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 14)
-      , bench "LetSem HO (Algol Memo) 14" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 14)
-      , bench "LetSem HO Full Memo 14" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 14)
-
-      , bench "LetSem (no memo) 15" $ nf ((LetSem.semantics)) (genLetProg 15)
-      , bench "LetSem HO Algol68 (no memo) 15" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 15)
-      , bench "LetSem HO (Algol Memo) 15" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 15)
-      , bench "LetSem HO Full Memo 15" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 15)
-
-
-      , bench "LetSem (no memo) 16" $ nf ((LetSem.semantics)) (genLetProg 16)
-      , bench "LetSem HO Algol68 (no memo) 16" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 16)
-      , bench "LetSem HO (Algol Memo) 16" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 16)
-      , bench "LetSem HO Full Memo 16" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 16)
-
-
-      , bench "LetSem (no memo) 17" $ nf ((LetSem.semantics)) (genLetProg 17)
-      , bench "LetSem HO Algol68 (no memo) 17" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 17)
-      , bench "LetSem HO (Algol Memo) 17" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 17)
-      , bench "LetSem HO Full Memo 17" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 17)
-
-      ]
-  ]
-
+---- Speeed Benchmark ----
+--main :: IO ()
+--main = defaultMain 
+--  [ bgroup "Let"
+--      [ bench "LetSem (no memo) 6" $ nf ((LetSem.semantics)) (genLetProg 6)
+--      , bench "LetSem HO Algol68 (no memo) 6" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 6)
+--      , bench "LetSem HO (Algol Memo) 6" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 6)
+--      , bench "LetSem HO Full Memo 6" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 6)
+--      
+--      , bench "LetSem (no memo) 7" $ nf ((LetSem.semantics)) (genLetProg 7)
+--      , bench "LetSem HO Algol68 (no memo) 7" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 7)
+--      , bench "LetSem HO (Algol Memo) 7" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 7)
+--      , bench "LetSem HO Full Memo 7" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 7)
+--
+--      , bench "LetSem (no memo) 8" $ nf ((LetSem.semantics)) (genLetProg 8)
+--      , bench "LetSem HO Algol68 (no memo) 8" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 8)
+--      , bench "LetSem HO (Algol Memo) 8" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 8)
+--      , bench "LetSem HO Full Memo 8" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 8)
+--
+--      , bench "LetSem (no memo) 9" $ nf ((LetSem.semantics)) (genLetProg 9)
+--      , bench "LetSem HO Algol68 (no memo) 9" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 9)
+--      , bench "LetSem HO (Algol Memo) 9" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 9)
+--      , bench "LetSem HO Full Memo 9" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 9)
+--
+--      , bench "LetSem (no memo) 10" $ nf ((LetSem.semantics)) (genLetProg 10)
+--      , bench "LetSem HO Algol68 (no memo) 10" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 10)
+--      , bench "LetSem HO (Algol Memo) 10" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 10)
+--      , bench "LetSem HO Full Memo 10" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 10)
+--
+--      , bench "LetSem (no memo) 11" $ nf ((LetSem.semantics)) (genLetProg 11)
+--      , bench "LetSem HO Algol68 (no memo) 11" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 11)
+--      , bench "LetSem HO (Algol Memo) 11" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 11)
+--      , bench "LetSem HO Full Memo 11" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 11)
+--
+--      , bench "LetSem (no memo) 12" $ nf ((LetSem.semantics)) (genLetProg 12)
+--      , bench "LetSem HO Algol68 (no memo) 12" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 12)
+--      , bench "LetSem HO (Algol Memo) 12" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 12)
+--      , bench "LetSem HO Full Memo 12" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 12)
+--
+--      , bench "LetSem (no memo) 13" $ nf ((LetSem.semantics)) (genLetProg 13)
+--      , bench "LetSem HO Algol68 (no memo) 13" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 13)
+--      , bench "LetSem HO (Algol Memo) 13" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 13)
+--      , bench "LetSem HO Full Memo 13" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 13)
+--
+--      , bench "LetSem (no memo) 14" $ nf ((LetSem.semantics)) (genLetProg 14)
+--      , bench "LetSem HO Algol68 (no memo) 14" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 14)
+--      , bench "LetSem HO (Algol Memo) 14" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 14)
+--      , bench "LetSem HO Full Memo 14" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 14)
+--
+--      , bench "LetSem (no memo) 15" $ nf ((LetSem.semantics)) (genLetProg 15)
+--      , bench "LetSem HO Algol68 (no memo) 15" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 15)
+--      , bench "LetSem HO (Algol Memo) 15" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 15)
+--      , bench "LetSem HO Full Memo 15" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 15)
+--
+--
+--      , bench "LetSem (no memo) 16" $ nf ((LetSem.semantics)) (genLetProg 16)
+--      , bench "LetSem HO Algol68 (no memo) 16" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 16)
+--      , bench "LetSem HO (Algol Memo) 16" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 16)
+--      , bench "LetSem HO Full Memo 16" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 16)
+--
+--
+--      , bench "LetSem (no memo) 17" $ nf ((LetSem.semantics)) (genLetProg 17)
+--      , bench "LetSem HO Algol68 (no memo) 17" $ nf ((LetSem_Algol68_mBIn_Rec.semantics)) (genLetProg 17)
+--      , bench "LetSem HO (Algol Memo) 17" $ nf ((LetSem_Memo_Algol68_mBIn_Rec.semantics)) (genLetProg 17)
+--      , bench "LetSem HO Full Memo 17" $ nf ((LetSem_Algol68_mBIn_Rec_FullMemo.semantics)) (genLetProg 17)
+--
+--      ]
+--  ]
+--
