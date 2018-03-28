@@ -14,21 +14,6 @@ data Cons = CRoot | CFork | CLeaf Int
 
 -- MemoAG --------------------------------------------
 
-{-
-lookupAttr :: Att a -> MemoTable -> Maybe a
-lookupAttr Globmin v   = v  -- (v,_,_) = v
---lookupAttr Locmin     (_,v,_) = v
---lookupAttr Replace    (_,_,v) = v
-lookupAttr  _ _ = Nothing
-
-updAttr :: Att a -> Maybe a -> MemoTable -> MemoTable
-updAttr Globmin v _ = v -- v   (_,l,r) = (v,l,r)
---updAttr Locmin  v   (g,_,r) = (g,v,r)
---updAttr Replace v   (g,l,_) = (g,l,v)
-updAttr _ _ m = m
-
--}
-
 -- MemoTree
 
 data Tree_m m 
