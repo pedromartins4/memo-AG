@@ -5,27 +5,29 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE InstanceSigs #-}
+-- {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
-{-# LANGUAGE NoMonomorphismRestriction #-}
+-- {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilyDependencies #-}
+-- {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE PatternSynonyms #-}
+-- {-# LANGUAGE ViewPatterns #-}
+-- {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeInType #-}
-{-# LANGUAGE TemplateHaskell #-}
+-- {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE LiberalTypeSynonyms #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE UnicodeSyntax #-}
+-- {-# LANGUAGE LiberalTypeSynonyms #-}
+-- {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE MultiWayIf #-}
+-- {-# LANGUAGE UnicodeSyntax #-}
+{-# LANGUAGE CPP #-}
 
 -- |
 -- Module      : Main
@@ -36,22 +38,59 @@
 -- Stability   : experimental
 module Main where
 
+import Control.Exception (assert)
 import Data.Maybe
 import Data.Kind
--- import Data.Proxy
+
+import Data.Constraint
 
 import GHC.Generics
--- import GHC.TypeLits
+import GHC.TypeLits
+
+import Unsafe.Coerce
 
 import Zipper
 
-{-
-class WhereAmI' p (a :: Symbol) where
-  position' :: Proxy a -> p
+import Data.Proxy
+import Control.Monad.Trans.State.Strict
+import Data.Vinyl (FieldRec, ElField(..), Rec(..), RecElem(..))
+import Data.Vinyl.TypeLevel (RIndex)
+import qualified Data.Vinyl as Vinyl
 
-at :: forall a p. WhereAmI' p a => p
-at = position' (Proxy :: Proxy a)
--}
+type Memo = FieldRec '[ '("globmin", Maybe Int)
+                      , '("locmin", Maybe Int)
+                      ]
+
+memo ::
+     forall (name :: Symbol)
+            (field :: (Symbol, Type))
+            (fields :: [(Symbol, Type)])
+            (x :: Type)
+            (a :: Type).
+     ( RecElem Rec field fields (RIndex field fields)
+     , field ~ '(name, Maybe x)
+     , KnownFunction name (a -> x)
+     )
+  => a
+  -> State (Vinyl.FieldRec fields) x
+memo x = do
+  let semantic = toFunction (Proxy :: Proxy name)
+  s <- get
+  case Vinyl.rget (Proxy :: Proxy field) s of
+    Vinyl.Field Nothing ->
+      let !y = semantic x
+      in put (Vinyl.rput (Vinyl.Field (Just y) :: Vinyl.ElField field) s) >>
+         return y
+    Vinyl.Field (Just y) -> return y
+
+class KnownFunction (s :: Symbol) (a :: Type) | s -> a where
+  toFunction :: Proxy s -> a
+
+instance KnownFunction "globmin" (Int -> Int) where
+  toFunction _ = (\x -> 2 * x)
+
+foo :: State Memo Int
+foo = memo @"globmin" 321
 
 -- User code
 --------------------------------------------------------------------------------
@@ -64,9 +103,16 @@ data Tree
   | Leaf Int
   deriving (Show, Read, Generic)
 
+class (a c, b c) => (&&&) (a :: Type -> Constraint) (b :: Type -> Constraint) c
+infixl 4 &&&
+
+instance (a c, b c) => (a &&& b) c
+
+type Cxt = WhereAmI Position
+
 -- | Definition of the "globmin" attribute.
 --
-globmin :: Zipper (WhereAmI Position) Tree -> Int
+globmin :: Zipper Cxt Tree -> Int
 globmin z = case up z of
   Nothing -> locmin z
   Just z' -> globmin z'
@@ -74,7 +120,7 @@ globmin z = case up z of
 -- | Definition of the "locmin" attribute.
 --
 -- @WhereAmI Position@ allows one to pattern match using 'Position' GADT.
-locmin :: Zipper (WhereAmI Position) Tree -> Int
+locmin :: Zipper Cxt Tree -> Int
 locmin z@(Zipper hole _) = case position hole of
   -- The cool thing here is that the type of @'C_Leaf'@ is @'Position Tree'@
   -- which means that after pattern matching on @'C_Leaf'@ GHC knows that
@@ -112,6 +158,9 @@ data Position :: Type -> Type where
   C_Leaf :: Position Tree
   C_Fork :: Position Tree
 
+deriving instance Eq (Position a)
+deriving instance Show (Position a)
+
 -- | Represents the ability to "look around".
 class WhereAmI (p :: Type -> Type) (a :: Type) where
   position :: a -> p a
@@ -119,14 +168,6 @@ class WhereAmI (p :: Type -> Type) (a :: Type) where
 instance WhereAmI Position Tree where
   position (Fork _ _) = C_Fork
   position (Leaf _) = C_Leaf
-
-{-
-instance WhereAmI' (Position Tree) "Fork" where
-  position' _ = C_Fork
-
-instance WhereAmI' (Position Tree) "Leaf" where
-  position' _ = C_Leaf
--}
 
 -- An example
 --------------------------------------------------------------------------------
@@ -137,4 +178,4 @@ t1 = Fork (Fork (Leaf 123)
           (Leaf 5)
 
 main :: IO ()
-main = print . replace . enter $ t1
+main = print "Hello!" -- print . replace . enter $ t1

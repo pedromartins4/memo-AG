@@ -24,6 +24,8 @@
 -- {-# LANGUAGE LiberalTypeSynonyms #-}
 {-# LANGUAGE ExistentialQuantification #-}
 -- {-# LANGUAGE UnicodeSyntax #-}
+{-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 -- |
 -- Module      : Zipper
@@ -76,7 +78,11 @@ data Zipper (c :: Type -> Constraint) (root :: Type) =
            , _zCtxt :: !(Context c hole root)
            }
 
--- | Context consists of a 'LocalContext' and a path to the @root@ of the zipper.
+-- let x = ... in cache "globmin" x >> x
+-- Zipper c '["globmin"] root
+
+-- | Context consists of a 'LocalContext' and a path to the @root@ of the
+-- zipper.
 data Context :: (Type -> Constraint) -> Type -> Type -> Type where
   RootContext :: forall c root. Context c root root
   (:>) :: forall c parent hole root rights. (c parent, Dissectible c parent)
@@ -91,12 +97,14 @@ data LocalContext c hole rights parent =
 -- | Encoding of arguments to the left of the hole.
 data Left c expects where
   LOne  :: b -> Left c b
-  LCons :: (c b, Dissectible c b) => Left c (b -> expects) -> b -> Left c expects
+  LCons :: (c b, Dissectible c b)
+        => Left c (b -> expects) -> b -> Left c expects
 
 -- | Encoding of arguments to the right of the hole.
 data Right c provides r where
   RNil  :: Right c r r
-  RCons :: (c b, Dissectible c b) => b -> Right c provides r -> Right c (b -> provides) r
+  RCons :: (c b, Dissectible c b)
+        => b -> Right c provides r -> Right c (b -> provides) r
 
 -- | A class of types that can can be dissected.
 class Dissectible (c :: Type -> Constraint) (a :: Type) where
