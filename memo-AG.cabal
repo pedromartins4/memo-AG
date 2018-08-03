@@ -29,10 +29,26 @@ library
     , deepseq
     , constraints
     , generic-deriving
+    , transformers
   exposed-modules:
       Zipper
   ghc-options: -O0 -Wall -fprof-auto
   default-language: Haskell2010
+  default-extensions:  GeneralizedNewtypeDeriving
+                       DeriveDataTypeable
+                       DeriveGeneric
+                       BangPatterns
+                       FlexibleContexts
+                       FlexibleInstances
+                       GADTs
+                       TypeApplications
+                       TypeFamilies
+                       TypeOperators
+                       ScopedTypeVariables
+                       TypeApplications
+                       DataKinds
+                       RankNTypes
+                       TypeInType
 
 -- executable repmin-time
 --   -- type: exitcode-stdio-1.0
