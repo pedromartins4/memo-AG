@@ -20,6 +20,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 -- {-# LANGUAGE LiberalTypeSynonyms #-}
 {-# LANGUAGE ExistentialQuantification #-}
@@ -37,11 +38,13 @@
 module Zipper
   ( -- * Core types
     Zipper(..)
+  , Memo(..)
   , Context(..)
   , LocalContext(..)
   , Left(..)
   , Right(..)
   , Dissectible(..)
+  , ToMaybe
     -- * Entering and leaving
   , enter
   , leave
@@ -50,42 +53,97 @@ module Zipper
   , down
   , left
   , right
+  , child
+  , whichChild
+   -- * Working with the Memo table
+  , aget
+  , aput
   ) where
 
 -- import Data.Coerce
-import Data.Constraint (Constraint)
-import Data.Kind
--- import Data.Maybe
+import           Control.Monad                  ( (>=>) )
+import           Data.Default.Class
+import           Data.Constraint                ( Constraint )
+import           Data.Kind
+import           GHC.TypeLits
+-- import           Data.Maybe                     ( fromJust )
 -- import Data.Proxy
 -- import GHC.Generics
 -- import Unsafe.Coerce
 
--- | The zipper. It consists of a hole and surrounding context.
+import           Data.Vinyl              hiding ( RNil )
+import qualified Data.Vinyl.ARec               as Vinyl
+import           Data.Vinyl.TypeLevel           ( RIndex
+                                                , NatToInt
+                                                )
+-- import           Data.Vinyl.Functor             ( Thunk )
+
+-- | The AG zipper. It consists of two zippers: @_zHole@ and @_zCxt@ constitute
+-- a generic zipper into a user-defined data structure (see the Scrap Your
+-- Zippers paper for more info); @_zMemo@ is a zipper into an infinite cache.
+--
+-- @c@ specifies additional constraints all elements of the user-defined data
+-- structures satisfy.
+--
+-- @attributes@ specifies the memoized attributes.
 --
 -- @root@ specifies the type of the value for which the zipper was actually
 -- created.
---
--- @c@ specifies some additional user-defined constraints. For example, we can
--- have a @'Zipper' 'Show' Tree@ which implies that each node in out tree is
--- 'Show'able:
---
--- > showCurrent :: 'Zipper' 'Show' a -> 'String'
--- > showCurrent ('Zipper' hole _) = 'show' hole
---
-data Zipper (c :: Type -> Constraint) (root :: Type) =
+data Zipper (c :: Type -> Constraint)
+            (attributes :: [(Symbol, Type)])
+            (root :: Type) =
   forall hole. (c hole, Dissectible c hole) =>
-    Zipper { _zHole :: hole
-           , _zCtxt :: !(Context c hole root)
-           }
+    Z { _zHole :: hole
+      , _zMemo :: !(Memo attributes)
+      , _zCxt  :: !(Context c hole root)
+      }
 
--- let x = ... in cache "globmin" x >> x
--- Zipper c '["globmin"] root
+type family ToMaybe (xs :: [(Symbol, Type)]) where
+  ToMaybe '[] = '[]
+  ToMaybe ( '(s,t) ': xs ) = '(s, Maybe t) ': (ToMaybe xs)
+
+data Memo (attributes :: [(Symbol, Type)]) =
+  M { _mCurrent :: {-# UNPACK #-}!(AFieldRec (ToMaybe attributes))
+    , _mLeft    :: Memo attributes
+    , _mRight   :: Memo attributes
+    , _mUp      :: Memo attributes
+    , _mDown    :: Memo attributes
+    }
+
+
+-- | Returns the specified attribute.
+aget :: forall (name :: Symbol)
+               (field :: (Symbol, Type))
+               (x :: Type)
+               c
+               attributes
+               root.
+        ( KnownSymbol name
+        , NatToInt (RIndex field (ToMaybe attributes))
+        , field ~ '(name, Maybe x)
+        ) => Zipper c attributes root -> Maybe x
+aget (Z _ m _) = case Vinyl.aget @field (_mCurrent m) of (Field x) -> x
+
+-- | Updates the specified attribute.
+aput :: forall (name :: Symbol)
+               (field :: (Symbol, Type))
+               (x :: Type)
+               c
+               attributes
+               root.
+        ( KnownSymbol name
+        , NatToInt (RIndex field (ToMaybe attributes))
+        , field ~ '(name, Maybe x)
+        ) => x -> Zipper c attributes root -> Zipper c attributes root
+aput x z@(Z _ m _) = let f = _mCurrent m
+                         f' = Vinyl.aput @field (Field (Just x)) f
+                      in z { _zMemo = m { _mCurrent = f' } }
 
 -- | Context consists of a 'LocalContext' and a path to the @root@ of the
 -- zipper.
 data Context :: (Type -> Constraint) -> Type -> Type -> Type where
   RootContext :: forall c root. Context c root root
-  (:>) :: forall c parent hole root rights. (c parent, Dissectible c parent)
+  (:>) :: forall c parent root hole rights. (c parent, Dissectible c parent)
        => !(Context c parent root)
        -> {-# UNPACK #-} !(LocalContext c hole rights parent)
        -> Context c hole root
@@ -111,10 +169,11 @@ class Dissectible (c :: Type -> Constraint) (a :: Type) where
   dissect :: a -> Left c a
 
 -- | Moves the 'Zipper' down.
-down :: forall c root. Zipper c root -> Maybe (Zipper c root)
-down (Zipper hole ctxt) = case dissect @c hole of
-  LOne _ -> Nothing
-  (xs `LCons` x) -> Just $ Zipper x (ctxt :> (LocalContext xs RNil))
+down :: forall c as root. Zipper c as root -> Maybe (Zipper c as root)
+down (Z hole memo ctxt) = case dissect @c hole of
+  LOne _         -> Nothing
+  (xs `LCons` x) -> Just $ Z x (memoDown memo) (ctxt :> (LocalContext xs RNil))
+  where memoDown m = (_mDown m) { _mUp = m }
 
 localUp :: hole -> LocalContext c hole rights parent -> parent
 localUp hole (LocalContext lefts rights) =
@@ -128,36 +187,59 @@ localUp hole (LocalContext lefts rights) =
     applyRights f (y `RCons` r) = f y `applyRights` r
 
 -- | Moves the 'Zipper' up.
-up :: forall c root. Zipper c root -> Maybe (Zipper c root)
-up (Zipper _ RootContext) = Nothing
-up (Zipper hole (p :> ctxt)) = Just $ Zipper (localUp hole ctxt) p
+up :: forall c as root. Zipper c as root -> Maybe (Zipper c as root)
+up (Z _ _ RootContext) = Nothing
+up (Z hole memo (p :> ctxt)) = Just $ Z (localUp hole ctxt) (memoUp memo) p
+  where memoUp m = case ctxt of
+          (LocalContext _ RNil) -> (_mUp m) { _mDown = m }
+          _ -> _mUp m
 
 -- | Moves the 'Zipper' left.
-left :: forall c root. Zipper c root -> Maybe (Zipper c root)
-left (Zipper _ RootContext) = Nothing
-left (Zipper hole (p :> (LocalContext lefts rights))) =
+left :: forall c as root. Zipper c as root -> Maybe (Zipper c as root)
+left (Z _ _ RootContext) = Nothing
+left (Z hole memo (p :> (LocalContext lefts rights))) =
   case lefts of
     LOne _ -> Nothing
     (xs `LCons` x) ->
-      Just $ Zipper x (p :> (LocalContext xs (hole `RCons` rights)))
+      Just $ Z x (memoLeft memo) (p :> (LocalContext xs (hole `RCons` rights)))
+  where memoLeft m = (_mLeft m) { _mRight = m, _mUp = _mUp m }
 
 -- | Moves the 'Zipper' right.
-right :: forall c root. Zipper c root -> Maybe (Zipper c root)
-right (Zipper _ RootContext) = Nothing
-right (Zipper hole (p :> (LocalContext lefts rights))) =
+right :: forall c as root. Zipper c as root -> Maybe (Zipper c as root)
+right (Z _ _ RootContext) = Nothing
+right (Z hole memo (p :> (LocalContext lefts rights))) =
   case rights of
     RNil -> Nothing
     (x `RCons` xs) ->
-      Just $ Zipper x (p :> (LocalContext (lefts `LCons` hole) xs))
+      Just $ Z x (memoRight memo) (p :> (LocalContext (lefts `LCons` hole) xs))
+  where memoRight m = (_mRight m) { _mLeft = m }
+
+child :: Int -> Zipper c as root -> Maybe (Zipper c as root)
+child !n !z | n < 0 = error $! "Expected a natural number, but got: " <> show n
+            | otherwise = toNth 0 =<< (theLeftOne <$> down z)
+ where
+   theLeftOne !x = case left x of
+     Nothing -> x
+     Just x' -> theLeftOne x'
+   toNth !i | i == n    = return
+            | otherwise = right >=> toNth (i + 1)
+
+whichChild :: Zipper c as root -> Int
+whichChild !x = go x 0
+  where
+    go !z !n = case left z of
+      Nothing -> n
+      Just z' -> go z' (n + 1)
 
 -- | Enters a 'Zipper'.
-enter :: forall c root. (c root, Dissectible c root) => root -> Zipper c root
-enter x = Zipper x RootContext
+enter :: forall c as root. (c root, Dissectible c root, Default (Memo as))
+      => root -> Zipper c as root
+enter x = Z x def RootContext
 
 -- | Leaves the 'Zipper'.
-leave :: forall c root. Zipper c root -> root
+leave :: forall c as root. Zipper c as root -> root
 leave z = case top z of
-  (Zipper hole RootContext) -> hole
+  (Z hole _ RootContext) -> hole
   _ -> error $! "Bug! Bug! Bug!"
   where top x = case up x of
           Nothing -> x
