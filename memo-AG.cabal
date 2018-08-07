@@ -30,9 +30,14 @@ library
     , constraints
     , generic-deriving
     , transformers
+    , syz
+    , ZipperAG
   exposed-modules:
       Zipper
-  ghc-options: -O0 -Wall -fprof-auto
+    , Desk
+    , Desk.New.Desk
+    , Desk.Old.Memo
+  ghc-options: -O0 -Wall -Wno-orphans -fprof-auto
   default-language: Haskell2010
   default-extensions:  GeneralizedNewtypeDeriving
                        DeriveDataTypeable
@@ -62,8 +67,25 @@ library
 --   ghc-options: -O2 -fprof-auto -rtsopts
 --   default-language: Haskell2010
 
-executable main
-  hs-source-dirs: app
+executable repmin
+  hs-source-dirs: app/Repmin
+  main-is: Main.hs 
+  build-depends:
+      base >=4.7 && <5
+    , data-default-class
+    , constraints
+    , deepseq 
+    , memo-AG
+    , vinyl
+    , transformers
+    -- , lens
+    -- , zippers
+    -- , HList
+  ghc-options: -O2 -Wall -fprof-auto -rtsopts
+  default-language: Haskell2010
+
+executable desk
+  hs-source-dirs: app/Desk
   main-is: Main.hs 
   build-depends:
       base >=4.7 && <5
