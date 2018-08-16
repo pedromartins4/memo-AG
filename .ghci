@@ -1,0 +1,4 @@
+:set -XOverloadedStrings
+:set +m
+:set prompt "λ> "
+:set prompt-cont "λ| "
