@@ -34,15 +34,20 @@
 
 -- |
 -- Module      : Zipper
--- Description : A generic zipper.
+-- Description : A generic zipper for embedding attribute grammars.
 -- Copyright   : (c) Tom Westerhout, 2018
--- License     : GPL-3.0
+-- License     : GPL-3
 -- Maintainer  : t.westerhout@student.ru.nl
 -- Stability   : experimental
 module Zipper
-  ( -- ** The Zipper
+  ( -- ** Motivation
+    -- $motivation
+
+    -- ** The Zipper
     Zipper(..)
   , pattern Zipper
+  , enter
+  , leave
   , up
   , down
   , left
@@ -57,10 +62,6 @@ module Zipper
   , unsafeChild
   , Direction(..)
   , unsafeAt
-    -- * Entering and leaving
-  , enter
-  , leave
-    -- * Movement
     -- * Working with the Memo table
   , Memo(..)
   , memoize
@@ -84,8 +85,9 @@ import           Data.Constraint                ( Constraint )
 import           Data.Kind
 import           Data.Proxy
 import           Debug.Trace
-import           GHC.TypeLits
 import           GHC.Generics                   ( Generic )
+import           GHC.Stack
+import           GHC.TypeLits
 
 import           Data.Vinyl              hiding ( RNil )
 import qualified Data.Vinyl.ARec               as Vinyl
@@ -94,7 +96,40 @@ import           Data.Vinyl.TypeLevel           ( RIndex
                                                 )
 -- import           Data.Vinyl.Functor             ( Thunk )
 
--- | The AG zipper.
+
+
+
+
+-- $motivation
+--
+-- Let's review the current imlementation of the Desk language example. First of
+-- all, we construct some new data structure @MemoTree@ which requires a full
+-- traversal of our "forest" of data structures starting in @Program@. On one
+-- hand, @buildMemoTree@ should be lazy such that the conversion is done on
+-- demand. On the other hand, however, all the strictness information from the
+-- user-defined data structures is lost!
+--
+-- Next, we construct a zipper from @MemoTree@ and compute the @code@ attribute
+-- on it. The definition of the @code@ function is pretty neat and quite closely
+-- follows the AG. However, its type @Dir -> MemoAG a@ removes a lot of
+-- expressive power zippers have. What if I want to get the code attribute of
+-- the second child of the left sibling of the third child? I could do it with
+-- zippers as @child 3 >>> left >>> child 2@. With memoisation added, we can't
+-- make arbitrary movements anymore.
+--
+-- My next concern is the @lexeme@ function. Seeing as it works explicitly with
+-- @MemoTree@ it's reasonable to assume that it should be generated
+-- automatically. But what's it's type signature in the general case? Or at
+-- least the semantics? Say, we stored numbers as 'Integer's rather than
+-- 'String's. Now the lexeme function doesn't work anymore. In other words,
+-- current approach lacks a general way of extracting the user-defined data and
+-- performing some operations on it.
+--
+-- Now, the conjecture is that modifying a zipper to traverse 2 data structures
+-- simultaneously, we can get rid of all the problems described above :)
+
+
+-- | The AG Zipper.
 --
 -- It consists of two zippers
 --
@@ -136,7 +171,7 @@ data Zipper (c :: Type -> Constraint) (attributes :: [(Symbol, Type)]) (root :: 
       }
 
 -- | You, as an end-user, don't care about the attribute cache and context. This
--- pattern synonym hides this details while still providing access to the hole.
+-- pattern synonym hides these details while still providing access to the hole.
 pattern Zipper :: () => (c hole, Dissectible c hole) => hole -> Zipper c attributes root
 pattern Zipper h <- (Z h _ _)
 {-# COMPLETE Zipper #-}
@@ -167,6 +202,9 @@ data Memo (attributes :: [(Symbol, Type)]) =
     }
 
 -- | Returns the specified attribute.
+--
+-- /Note/ compared to @lookupAttr@ in the original approach, this function is
+-- general and requires no TH magic!
 aget
   :: forall name field x c attributes root.
      ( KnownSymbol name
@@ -178,6 +216,9 @@ aget
 aget (Z _ m _) = case Vinyl.aget @field (_mCurrent m) of (Field x) -> x
 
 -- | Updates the specified attribute.
+--
+-- /Note/ compared to @updateAttr@ in the original approach, this function is
+-- general and requires no TH magic!
 aput
   :: forall name field x c attributes root.
      ( KnownSymbol name
@@ -191,7 +232,7 @@ aput x z@(Z _ m _) = let f = _mCurrent m
                          f' = Vinyl.aput @field (Field (Just x)) f
                       in z { _zMemo = m { _mCurrent = f' } }
 
--- | Given the @name@ of an attribute a monadic computation to calculate the
+-- | Given the @name@ of an attribute and a monadic computation to calculate the
 -- attribute, returns a monadic computation of the same type which will use
 -- caching to speed-up the calculation.
 memoize
@@ -213,7 +254,8 @@ memoize semantic = (aget @name <$> get) >>= \case
     return y
   (Just y) -> return y
 
--- | Specifies the position, where to evaluate the attribute.
+-- | Specifies the position, where to evaluate the attribute. This is an
+-- extension of the original @Dir@ data type.
 --
 -- /Note:/ using "Left" and "Right" is probably not a great idea. Better name
 -- suggestions are very welcome.
@@ -224,7 +266,16 @@ data Direction = Left
                | Direction :~> Direction
   deriving (Read, Show, Generic, NFData)
 
-unsafeAt :: Monad m => Direction -> StateT (Zipper c as root) m a -> StateT (Zipper c as root) m a
+-- | Moves the zipper in the given direction, runs the monadic action and then
+-- moves back.
+--
+-- /Note:/ this function is unsafe because it requires Direction to be a valid
+-- movement.
+unsafeAt
+  :: (HasCallStack, Monad m)
+  => Direction
+  -> StateT (Zipper c as root) m a
+  -> StateT (Zipper c as root) m a
 unsafeAt d action = do
   !(forth, back) <- mkMovements d <$> get
   modify forth
@@ -241,33 +292,7 @@ unsafeAt d action = do
                                      !(f2, b2) = mkMovements d2 (f1 z)
                                   in (f2 . f1, b1 . b2)
 
-{-
-class WithRollback z d where
-  unsafeAt :: Show a => d -> State z a -> State z a
-
-instance WithRollback (Zipper c attributes root) Direction where
-  unsafeAt direction action = case direction of
-    Left -> go unsafeLeft action unsafeRight
-    Right -> go unsafeRight action unsafeLeft
-    Parent -> do n <- whichChild <$> get
-                 modify unsafeUp
-                 x <- action
-                 modify (unsafeChild n)
-                 return x
-    Child i -> go (unsafeChild i) action unsafeUp
-    where
-      -- go :: (Zipper Cxt attributes root -> Zipper Cxt attributes root)
-      --    -> State (Zipper Cxt attributes root) a
-      --    -> (Zipper Cxt attributes root -> Zipper Cxt attributes root)
-      --    -> State (Zipper Cxt attributes root) a
-      go before now after = do
-        modify before
-        x <- now
-        modify after
-        return x
--}
-
--- | Context consists of a 'LocalContext' and a path to the @root@ of the
+-- | A context consists of a 'LocalContext' and a path to the @root@ of the
 -- zipper.
 data Context :: (Type -> Constraint) -> Type -> Type -> Type where
   RootContext :: forall c root. Context c root root
@@ -292,10 +317,13 @@ data Right c provides r where
   RCons :: (c b, Dissectible c b)
         => b -> Right c provides r -> Right c (b -> provides) r
 
--- | A class of types that can can be dissected.
+-- | A class of types which can can be dissected.
 class Dissectible (c :: Type -> Constraint) (a :: Type) where
   dissect :: a -> Left c a
 
+-- | Returns whether you're at the root of the zipper. This eliminates the need
+-- to define a special @Root@ data structure for each AG which preserving the
+-- expressive power.
 isRoot :: Monad m => StateT (Zipper c attributes root) m Bool
 isRoot = get >>= \case
   (Z _ _ (_:>_))      -> return False
@@ -347,6 +375,7 @@ right (Z hole memo (p :> (LocalContext lefts rights))) =
       Just $ Z x (memoRight memo) (p :> (LocalContext (lefts `LCons` hole) xs))
   where memoRight m = (_mRight m) { _mLeft = m }
 
+-- | Returns the child at the specified index. __Counting starts from 0!__
 child :: Int -> Zipper c as root -> Maybe (Zipper c as root)
 child !n !z | n < 0 = error $! "Expected a natural number, but got: " <> show n
             | otherwise = toNth 0 =<< (theLeftOne <$> down z)
@@ -357,6 +386,7 @@ child !n !z | n < 0 = error $! "Expected a natural number, but got: " <> show n
    toNth !i | i == n    = return
             | otherwise = right >=> toNth (i + 1)
 
+-- | The following relation holds: @Just x = up x >>= child (whichChild x)@
 whichChild :: Zipper c as root -> Int
 whichChild !x = go x 0
   where
@@ -378,21 +408,23 @@ leave z = case top z of
           Nothing -> x
           Just x' -> top x'
 
-checkInvalidMove :: Maybe a -> a
+checkInvalidMove :: HasCallStack => Maybe a -> a
 checkInvalidMove (Just x) = x
 checkInvalidMove Nothing  = error $! "Invalid move attempted!"
 
-unsafeUp :: Zipper c as root -> Zipper c as root
+unsafeUp :: HasCallStack => Zipper c as root -> Zipper c as root
 unsafeUp = checkInvalidMove . up
 
-unsafeDown :: Zipper c as root -> Zipper c as root
+unsafeDown :: HasCallStack => Zipper c as root -> Zipper c as root
 unsafeDown = checkInvalidMove . down
 
-unsafeLeft :: Zipper c as root -> Zipper c as root
+unsafeLeft :: HasCallStack => Zipper c as root -> Zipper c as root
 unsafeLeft = checkInvalidMove . left
 
-unsafeRight :: Zipper c as root -> Zipper c as root
+unsafeRight :: HasCallStack => Zipper c as root -> Zipper c as root
 unsafeRight = checkInvalidMove . right
 
-unsafeChild :: Int -> Zipper c as root -> Zipper c as root
+unsafeChild :: HasCallStack => Int -> Zipper c as root -> Zipper c as root
 unsafeChild !i = checkInvalidMove . child i
+
+
